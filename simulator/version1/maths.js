@@ -9,6 +9,38 @@ export class Vector {
         return this.values.length;
     }
 
+    get type() {
+        return 'Vector'
+    }
+
+    get x() {
+        return this.values[0]
+    }
+
+    get y() {
+        return this.values[1]
+    }
+
+    get z() {
+        return this.values[2]
+    }
+
+    get Vec2() {
+        return new Vector(this.values[0], this.values[1])
+    }
+
+    set x(value) {
+        this.values[0] = value
+    }
+
+    set y(value) {
+        this.values[1] = value
+    }
+
+    set z(value) {
+        this.values[2] = value
+    }
+
     copy() {
         return new Vector(...this.values);
     }
@@ -91,6 +123,10 @@ export class Matrix {
 
     get colCount() {
         return this.rows[0].length;
+    }
+
+    get type() {
+        return 'Matrix'
     }
 
     get(r, c) {

@@ -1,204 +1,178 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Circuit Sandbox V1</title>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Circuit Sandbox V1</title>
 
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+        <style>
+            * {
+                box-sizing: border-box;
+            }
 
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      height: 100vh;
-      overflow: hidden;
-    }
+            body {
+                margin: 0;
+                font-family: Arial, sans-serif;
+                background: #111;
+                color: #eee;
+                height: 100vh;
+                overflow: hidden;
+            }
 
-    .app {
-      display: grid;
-      grid-template-columns: 260px 1fr 220px;
-      height: 100vh;
-    }
+            .app {
+                display: grid;
+                grid-template-columns: 260px 1fr 220px;
+                height: 100vh;
+            }
 
-    .panel {
-      background: #181818;
-      border: 1px solid #2a2a2a;
-      padding: 14px;
-      overflow: hidden;
-    }
+            .panel {
+                background: #181818;
+                border: 1px solid #2a2a2a;
+                padding: 14px;
+                overflow: hidden;
+            }
 
-    .left {
-      border-right: none;
-    }
+            .left {
+                border-right: none;
+            }
 
-    .right {
-      border-left: none;
-    }
+            .right {
+                border-left: none;
+            }
 
-    h2, h3 {
-      margin: 0 0 12px;
-      font-weight: normal;
-    }
+            h2,
+            h3 {
+                margin: 0 0 12px;
+                font-weight: normal;
+            }
 
-    h2 {
-      font-size: 18px;
-    }
+            h2 {
+                font-size: 18px;
+            }
 
-    h3 {
-      font-size: 14px;
-      color: #aaa;
-      border-bottom: 1px solid #333;
-      padding-bottom: 6px;
-      margin-top: 18px;
-    }
+            h3 {
+                font-size: 14px;
+                color: #aaa;
+                border-bottom: 1px solid #333;
+                padding-bottom: 6px;
+                margin-top: 18px;
+            }
 
-    label {
-      display: block;
-      font-size: 13px;
-      color: #aaa;
-      margin-bottom: 6px;
-    }
+            label {
+                display: block;
+                font-size: 13px;
+                color: #aaa;
+                margin-bottom: 6px;
+            }
 
-    input {
-      width: 100%;
-      padding: 8px;
-      background: #101010;
-      border: 1px solid #333;
-      color: #eee;
-      border-radius: 4px;
-      margin-bottom: 10px;
-    }
+            input {
+                width: 100%;
+                padding: 8px;
+                background: #101010;
+                border: 1px solid #333;
+                color: #eee;
+                border-radius: 4px;
+                margin-bottom: 10px;
+            }
 
-    .component-type {
-      color: #ccc;
-      font-size: 15px;
-      margin-bottom: 16px;
-    }
+            .component-type {
+                color: #ccc;
+                font-size: 15px;
+                margin-bottom: 16px;
+            }
 
-    .property-row {
-      margin-bottom: 10px;
-    }
+            .property-row {
+                margin-bottom: 10px;
+            }
 
-    .canvas-wrap {
-      background: #0d0d0d;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 14px;
-    }
+            .canvas-wrap {
+                background: #0d0d0d;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 14px;
+            }
 
-    canvas {
-      width: 100%;
-      height: 100%;
-      background:
-        linear-gradient(#1a1a1a 1px, transparent 1px),
-        linear-gradient(90deg, #1a1a1a 1px, transparent 1px);
-      background-size: 24px 24px;
-      border: 1px solid #333;
-      border-radius: 6px;
-    }
+            canvas {
+                width: 100%;
+                height: 100%;
+                border: 1px solid #333;
+                border-radius: 6px;
+            }
 
-    .component-list {
-      height: calc(100vh - 58px);
-      overflow-y: auto;
-      padding-right: 4px;
-    }
+            .component-list {
+                height: calc(100vh - 58px);
+                overflow-y: auto;
+                padding-right: 4px;
+            }
 
-    .component-btn {
-      width: 100%;
-      background: #101010;
-      border: 1px solid #333;
-      color: #eee;
-      padding: 9px;
-      margin-bottom: 8px;
-      text-align: left;
-      border-radius: 4px;
-      cursor: pointer;
-    }
+            .component-btn {
+                width: 100%;
+                background: #101010;
+                border: 1px solid #333;
+                color: #eee;
+                padding: 9px;
+                margin-bottom: 8px;
+                text-align: left;
+                border-radius: 4px;
+                cursor: pointer;
+            }
 
-    .component-btn:hover {
-      background: #222;
-    }
-  </style>
-</head>
+            .component-btn:hover {
+                background: #222;
+            }
+        </style>
+    </head>
 
-<body>
-  <div class="app">
+    <body>
+        <div class="app">
+            <aside class="panel left">
+                <h2>Properties</h2>
 
-    <aside class="panel left">
-      <h2>Properties</h2>
+                <label for="component-name">Component Name</label>
+                <input id="component-name" type="text" value="R1" />
 
-      <label for="component-name">Component Name</label>
-      <input id="component-name" type="text" value="R1" />
+                <div class="component-type">Resistor</div>
 
-      <div class="component-type">Resistor</div>
+                <h3>Data</h3>
+                <div class="property-row">
+                    <label>Node A</label>
+                    <input type="text" value="n1" />
+                </div>
 
-      <h3>Data</h3>
-      <div class="property-row">
-        <label>Node A</label>
-        <input type="text" value="n1" />
-      </div>
+                <div class="property-row">
+                    <label>Node B</label>
+                    <input type="text" value="n2" />
+                </div>
 
-      <div class="property-row">
-        <label>Node B</label>
-        <input type="text" value="n2" />
-      </div>
+                <h3>Parameters</h3>
+                <div class="property-row">
+                    <label>Resistance</label>
+                    <input type="text" value="1000" />
+                </div>
+            </aside>
 
-      <h3>Parameters</h3>
-      <div class="property-row">
-        <label>Resistance</label>
-        <input type="text" value="1000" />
-      </div>
-    </aside>
+            <main class="canvas-wrap">
+                <canvas id="circuit-canvas"></canvas>
+            </main>
 
-    <main class="canvas-wrap">
-      <canvas id="circuit-canvas"></canvas>
-    </main>
+            <aside class="panel right">
+                <h2>Components</h2>
 
-    <aside class="panel right">
-      <h2>Components</h2>
+                <div class="component-list">
+                    <button class="component-btn">Resistor</button>
+                    <button class="component-btn">Capacitor</button>
+                    <button class="component-btn">Inductor</button>
+                    <button class="component-btn">Voltage Source</button>
+                    <button class="component-btn">Current Source</button>
+                    <button class="component-btn">Ground</button>
+                    <button class="component-btn">Diode</button>
+                    <button class="component-btn">Switch</button>
+                    <button class="component-btn">Wire</button>
+                </div>
+            </aside>
+        </div>
 
-      <div class="component-list">
-        <button class="component-btn">Resistor</button>
-        <button class="component-btn">Capacitor</button>
-        <button class="component-btn">Inductor</button>
-        <button class="component-btn">Voltage Source</button>
-        <button class="component-btn">Current Source</button>
-        <button class="component-btn">Ground</button>
-        <button class="component-btn">Diode</button>
-        <button class="component-btn">Switch</button>
-        <button class="component-btn">Wire</button>
-      </div>
-    </aside>
-
-  </div>
-
-  <script>
-    const canvas = document.getElementById("circuit-canvas");
-    const ctx = canvas.getContext("2d");
-
-    function resizeCanvas() {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
-      drawPlaceholder();
-    }
-
-    function drawPlaceholder() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = "#777";
-      ctx.font = "16px Arial";
-      ctx.textAlign = "center";
-      ctx.fillText("Circuit Canvas", canvas.width / 2, canvas.height / 2);
-    }
-
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
-  </script>
-</body>
+        <script type="module" src="handler.js"></script>
+    </body>
 </html>
