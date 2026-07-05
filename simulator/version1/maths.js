@@ -110,6 +110,20 @@ export class Vector {
     toString() {
         return `(${this.values.join(", ")})`;
     }
+
+    withinBounds(upper, lower) {
+        const dimensions = Math.min(this.length, upper.length, lower.length);
+
+        for (let i = 0; i < dimensions; i++) {
+            const min = Math.min(lower.get(i), upper.get(i));
+            const max = Math.max(lower.get(i), upper.get(i));
+            const value = this.get(i);
+
+            if (value < min || value > max) return false;
+        }
+
+        return true;
+    }
 }
 
 export class Matrix {

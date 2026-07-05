@@ -65,6 +65,7 @@ export class Component {
         this.layer = layer;
         this.hovered = false;
         this.rotation = rotation;
+        this.size = new Vector(0,0)
     }
 
     get type() {
@@ -92,6 +93,20 @@ export class Component {
                 Y: this.position.y,
             },
         };
+    }
+
+    onMouseMove(mouseGridPos) {
+        if (!this.visible || !mouseGridPos) {
+            this.hovered = false;
+            return;
+        }
+
+        const relativeMousePos = mouseGridPos.subtract(this.position);
+        const localMousePos = rotatePoint(relativeMousePos, -this.rotation);
+        const upper = new Vector(this.size.x, this.size.y / 2);
+        const lower = new Vector(0, -this.size.y / 2);
+
+        this.hovered = localMousePos.withinBounds(upper, lower);
     }
 
     setProperty(name, value) {
@@ -257,6 +272,31 @@ export class Wire extends Component {
 
         if (name === "End.Z") this.end.z = Number(value);
         if (name === "Visible") this.visible = Boolean(value);
+    }
+
+    onMouseMove(mouseGridPos) {
+        if (!this.visible || !mouseGridPos) {
+            this.hovered = false;
+            return;
+        }
+
+        const start = this.start.Vec2;
+        const end = this.end.Vec2;
+        const segment = end.subtract(start);
+        const segmentLengthSquared = segment.dot(segment);
+        const hoverDistance = 0.25;
+
+        if (segmentLengthSquared === 0) {
+            this.hovered = mouseGridPos.distance(start) <= hoverDistance;
+            return;
+        }
+
+        const point = mouseGridPos.subtract(start);
+        const projection = point.dot(segment) / segmentLengthSquared;
+        const t = Math.max(0, Math.min(1, projection));
+        const closestPoint = start.add(segment.multiply(t));
+
+        this.hovered = mouseGridPos.distance(closestPoint) <= hoverDistance;
     }
 
     draw(ctx, zoom, pan) {

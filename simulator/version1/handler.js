@@ -47,6 +47,24 @@ function updateMouseGridPosition(event) {
     mouseGridPosition = canvasToGridPosition(getCanvasPosition(event));
 }
 
+function updateHoverStates() {
+    let hoveredComponent = null;
+
+    for (let i = components.length - 1; i >= 0; i--) {
+        const component = components[i];
+
+        component.onMouseMove(mouseGridPosition);
+
+        if (component.hovered && !hoveredComponent) {
+            hoveredComponent = component;
+        }
+    }
+
+    for (const component of components) {
+        component.hovered = component === hoveredComponent;
+    }
+}
+
 function drawGrid() {
     const scaledGridSize = gridSize * zoom;
     const startX = ((pan.x % scaledGridSize) + scaledGridSize) % scaledGridSize;
@@ -111,6 +129,7 @@ canvas.addEventListener("mousedown", (event) => {
 
 canvas.addEventListener("mousemove", (event) => {
     updateMouseGridPosition(event);
+    updateHoverStates();
 
     if (!isPanning) {
         draw();
@@ -123,6 +142,7 @@ canvas.addEventListener("mousemove", (event) => {
     pan = pan.add(delta);
     lastMousePosition = mousePosition;
     mouseGridPosition = canvasToGridPosition(mousePosition);
+    updateHoverStates();
     draw();
 });
 
@@ -133,6 +153,7 @@ canvas.addEventListener("mouseup", (event) => {
 canvas.addEventListener("mouseleave", () => {
     isPanning = false;
     mouseGridPosition = null;
+    updateHoverStates();
     draw();
 });
 
@@ -155,6 +176,7 @@ canvas.addEventListener("wheel", (event) => {
 
     zoom = nextZoom;
     mouseGridPosition = canvasToGridPosition(mousePosition);
+    updateHoverStates();
     draw();
 });
 
