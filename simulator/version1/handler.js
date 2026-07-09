@@ -15,6 +15,7 @@ let isPanning = false;
 let isLMB = false;
 let lastMousePosition = new Vector(0, 0);
 let mouseGridPosition = null;
+let selectedObj = null;
 
 const components = [
     new Resistor("test", new Vector(4, 4), 0, 0, 5),
@@ -47,8 +48,6 @@ function updateMouseGridPosition(event) {
 function updateHoverStates() {
     let hoveredComponent = null;
 
-    console.log(1)
-
     for (const component of components) {
         component.onMouseMove(mouseGridPosition);
 
@@ -67,8 +66,6 @@ function updateHoverStates() {
 
     if (!hoveredComponent) return;
 
-    console.log(hoveredComponent.selectedTerminal)
-
     if (isLMB) {
         hoveredComponent.selected = hoveredComponent.hovered;
 
@@ -76,6 +73,8 @@ function updateHoverStates() {
             hoveredComponent.selectedTerminal =
                 hoveredComponent.hoveredTerminal;
         }
+    } else {
+        hoveredComponent.selected = false
     }
 }
 

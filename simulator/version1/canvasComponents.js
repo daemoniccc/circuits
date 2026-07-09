@@ -138,13 +138,16 @@ export class Component {
     }
 
     applyStyle(ctx) {
-        ctx.lineWidth = this.selected ? 4 : this.hovered ? 3 : 2;
-
-        ctx.strokeStyle = this.selected
-            ? "#ffb000"
-            : this.hovered
-              ? "#52a7ff"
-              : "#e8e8e8";
+        if (this.selected) {
+            ctx.lineWidth = 4
+            ctx.strokeStyle = "#ffb000"
+        } else if (this.hovered) {
+            ctx.lineWidth = 3
+            ctx.strokeStyle = "#52a7ff"
+        } else {
+            ctx.lineWidth = 2
+            ctx.strokeStyle = '#e8e8e8'
+        }
 
         ctx.fillStyle = ctx.strokeStyle;
 
@@ -336,19 +339,21 @@ export class Wire extends Component {
     drawTerminals(ctx, zoom, pan) {
         let i = 1;
         for (const connection of this.connections) {
-            ctx.lineWidth =
-                i === this.selectedTerminal
-                    ? 4
-                    : i === this.hoveredTerminal
-                      ? 3
-                      : 2;
+            const isSelected = i === this.selectedTerminal || this.selected;
+            const isHovered = i === this.hoveredTerminal || this.hovered;
 
-            ctx.strokeStyle =
-                i === this.selectedTerminal
-                    ? "#ffb000"
-                    : i === this.hoveredTerminal
-                      ? "#52a7ff"
-                      : "#e8e8e8";
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#e8e8e8";
+
+            if (isHovered) {
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#52a7ff";
+            }
+
+            if (isSelected) {
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "#ffb000";
+            }
 
             ctx.fillStyle = ctx.strokeStyle;
 
