@@ -15,7 +15,6 @@ function rotatePoint(p, angle) {
 
     const s = Math.sin(angle);
 
-
     return new Vector(
         p.x * c - p.y * s,
 
@@ -38,7 +37,16 @@ function drawPath(ctx, points, position, rotation, zoom, pan) {
     ctx.stroke();
 }
 
-function drawCircle(ctx, centre, radius, position, rotation, zoom, pan, fill = false) {
+function drawCircle(
+    ctx,
+    centre,
+    radius,
+    position,
+    rotation,
+    zoom,
+    pan,
+    fill = false,
+) {
     const world = position.add(rotatePoint(centre, rotation));
 
     const screen = worldToScreen(world, zoom, pan);
@@ -60,12 +68,15 @@ export class Component {
         this.position = position;
         this.connections = [];
 
+        this.selectedTerminal = 0;
+        this.hoveredTerminal = 0;
+
         this.selected = false;
         this.visible = true;
         this.layer = layer;
         this.hovered = false;
         this.rotation = rotation;
-        this.size = new Vector(0,0)
+        this.size = new Vector(0, 0);
     }
 
     get type() {
@@ -98,11 +109,14 @@ export class Component {
     onMouseMove(mouseGridPos) {
         if (!this.visible || !mouseGridPos) {
             this.hovered = false;
+            this.selected = false;
+            this.hoveredTerminal = 0;
             return;
         }
 
         const relativeMousePos = mouseGridPos.subtract(this.position);
         const localMousePos = rotatePoint(relativeMousePos, -this.rotation);
+
         const upper = new Vector(this.size.x, this.size.y / 2);
         const lower = new Vector(0, -this.size.y / 2);
 
@@ -149,7 +163,7 @@ export class Component {
                 this.rotation,
                 zoom,
                 pan,
-                true
+                true,
             );
         }
     }
@@ -163,7 +177,7 @@ export class Resistor extends Component {
         this.potentialDifference = 0;
         this.current = 0;
 
-        this.size = new Vector(5, 1)
+        this.size = new Vector(5, 1);
 
         this.connections = [new Vector(0, 0), new Vector(this.size.x, 0)];
     }
@@ -212,7 +226,12 @@ export class Resistor extends Component {
         const path = [];
 
         for (const point of pathA) {
-            path.push(new Vector(point.x * this.size.x, point.y * this.size.y - this.size.y/2));
+            path.push(
+                new Vector(
+                    point.x * this.size.x,
+                    point.y * this.size.y - this.size.y / 2,
+                ),
+            );
         }
 
         drawPath(ctx, path, this.position, this.rotation, zoom, pan);
@@ -226,10 +245,7 @@ export class Wire extends Component {
         this.start = start;
         this.end = end;
 
-        this.connections = [
-            new Vector (0,0),
-            end.subtract(start).Vec2
-        ]
+        this.connections = [new Vector(0, 0), end.subtract(start).Vec2];
     }
 
     get type() {
@@ -275,13 +291,31 @@ export class Wire extends Component {
     }
 
     onMouseMove(mouseGridPos) {
+        this.selectedTerminal = 0;
+        this.selected = false;
         if (!this.visible || !mouseGridPos) {
             this.hovered = false;
+
+            this.hoveredTerminal = 0;
             return;
         }
 
         const start = this.start.Vec2;
         const end = this.end.Vec2;
+
+        if (start.distance(mouseGridPos) <= 0.5) {
+            this.hovered = false;
+            this.hoveredTerminal = 1;
+            return;
+        } else if (end.distance(mouseGridPos) <= 0.5) {
+            this.hovered = false;
+            this.hoveredTerminal = 2;
+            return;
+        } else {
+            this.hoveredTerminal = 0;
+            this.selectedTerminal = 0;
+        }
+
         const segment = end.subtract(start);
         const segmentLengthSquared = segment.dot(segment);
         const hoverDistance = 0.25;
@@ -299,16 +333,53 @@ export class Wire extends Component {
         this.hovered = mouseGridPos.distance(closestPoint) <= hoverDistance;
     }
 
+    drawTerminals(ctx, zoom, pan) {
+        let i = 1;
+        for (const connection of this.connections) {
+            ctx.lineWidth =
+                i === this.selectedTerminal
+                    ? 4
+                    : i === this.hoveredTerminal
+                      ? 3
+                      : 2;
+
+            ctx.strokeStyle =
+                i === this.selectedTerminal
+                    ? "#ffb000"
+                    : i === this.hoveredTerminal
+                      ? "#52a7ff"
+                      : "#e8e8e8";
+
+            ctx.fillStyle = ctx.strokeStyle;
+
+            ctx.lineCap = "round";
+
+            ctx.lineJoin = "round";
+            drawCircle(
+                ctx,
+                connection,
+                3,
+                this.position,
+                this.rotation,
+                zoom,
+                pan,
+                true,
+            );
+            i++;
+        }
+    }
+
     draw(ctx, zoom, pan) {
         if (!this.visible) return;
 
-        super.draw(ctx, zoom, pan)
-
+        super.applyStyle(ctx);
         const path = [
             new Vector(0, 0),
-            new Vector(this.end.x - this.start.x, this.end.y - this.start.y)
+            new Vector(this.end.x - this.start.x, this.end.y - this.start.y),
         ];
 
         drawPath(ctx, path, this.position, 0, zoom, pan);
+
+        this.drawTerminals(ctx, zoom, pan);
     }
 }

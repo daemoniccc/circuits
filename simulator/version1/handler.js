@@ -1,4 +1,3 @@
-
 import { Vector } from "./maths.js";
 import { Resistor, Wire } from "./canvasComponents.js";
 
@@ -13,12 +12,13 @@ const gridSize = 10;
 let zoom = 1;
 let pan = new Vector(0, 0);
 let isPanning = false;
+let isLMB = false;
 let lastMousePosition = new Vector(0, 0);
 let mouseGridPosition = null;
 
 const components = [
     new Resistor("test", new Vector(4, 4), 0, 0, 5),
-    new Wire(new Vector(0, 10, 0), new Vector(4,4,0))
+    new Wire(new Vector(0, 10, 0), new Vector(4, 4, 0)),
 ];
 
 function resizeCanvas() {
@@ -30,10 +30,7 @@ function resizeCanvas() {
 function getCanvasPosition(event) {
     const rect = canvas.getBoundingClientRect();
 
-    return new Vector(
-        event.clientX - rect.left,
-        event.clientY - rect.top,
-    );
+    return new Vector(event.clientX - rect.left, event.clientY - rect.top);
 }
 
 function canvasToGridPosition(position) {
@@ -50,18 +47,35 @@ function updateMouseGridPosition(event) {
 function updateHoverStates() {
     let hoveredComponent = null;
 
-    for (let i = components.length - 1; i >= 0; i--) {
-        const component = components[i];
-
-        component.onMouseMove(mouseGridPosition);
-
-        if (component.hovered && !hoveredComponent) {
-            hoveredComponent = component;
-        }
-    }
+    console.log(1)
 
     for (const component of components) {
-        component.hovered = component === hoveredComponent;
+        component.onMouseMove(mouseGridPosition);
+
+        const isHovered = component.hovered || component.hoveredTerminal > 0;
+
+        if (isHovered && !hoveredComponent) {
+            hoveredComponent = component;
+            continue;
+        }
+
+        component.hovered = false;
+        component.selected = false;
+        component.hoveredTerminal = 0;
+        component.selectedTerminal = 0;
+    }
+
+    if (!hoveredComponent) return;
+
+    console.log(hoveredComponent.selectedTerminal)
+
+    if (isLMB) {
+        hoveredComponent.selected = hoveredComponent.hovered;
+
+        if (hoveredComponent.hoveredTerminal > 0) {
+            hoveredComponent.selectedTerminal =
+                hoveredComponent.hoveredTerminal;
+        }
     }
 }
 
@@ -108,9 +122,16 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid();
 
+    let drawLast;
+
     for (const component of components) {
         component.draw(ctx, zoom, pan);
+        if (component.hovered || component.selected) {
+            drawLast = component;
+        }
     }
+
+    if (drawLast) drawLast.draw(ctx, zoom, pan);
 
     drawMouseGridPosition();
 }
@@ -120,6 +141,12 @@ canvas.addEventListener("contextmenu", (event) => {
 });
 
 canvas.addEventListener("mousedown", (event) => {
+    updateMouseGridPosition(event);
+
+    if (event.button === 0) isLMB = true;
+    updateHoverStates();
+    draw();
+
     if (event.button !== 2) return;
 
     event.preventDefault();
@@ -147,7 +174,10 @@ canvas.addEventListener("mousemove", (event) => {
 });
 
 canvas.addEventListener("mouseup", (event) => {
+    if (event.button === 0) isLMB = false;
+    updateHoverStates();
     if (event.button === 2) isPanning = false;
+    draw();
 });
 
 canvas.addEventListener("mouseleave", () => {
