@@ -3,6 +3,7 @@ import { Resistor, Wire } from "./canvasComponents.js";
 
 const canvas = document.getElementById("circuit-canvas");
 const ctx = canvas.getContext("2d");
+const propertiesPanel = document.getElementById("properties-panel");
 
 const minZoom = 0.2;
 const maxZoom = 5;
@@ -15,7 +16,10 @@ let isPanning = false;
 let isLMB = false;
 let lastMousePosition = new Vector(0, 0);
 let mouseGridPosition = null;
-let selectedObj = null;
+let selectedComponent = null;
+let selectedTerminal = 0;
+let hoveredComponent = null;
+let startedPickUpOffset = new Vector(0, 0);
 
 const components = [
     new Resistor("test", new Vector(4, 4), 0, 0, 5),
@@ -45,8 +49,104 @@ function updateMouseGridPosition(event) {
     mouseGridPosition = canvasToGridPosition(getCanvasPosition(event));
 }
 
+function formatPropertyValue(value) {
+    if (typeof value === "number") return Number(value.toFixed(4)).toString();
+    return String(value);
+}
+
+function renderPropertyGroup(properties, parentPath = "") {
+    const fragment = document.createDocumentFragment();
+
+    for (const [name, value] of Object.entries(properties)) {
+        const path = parentPath ? `${parentPath}.${name}` : name;
+
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+            const heading = document.createElement("h3");
+            heading.textContent = name;
+            fragment.appendChild(heading);
+            fragment.appendChild(renderPropertyGroup(value, path));
+            continue;
+        }
+
+        const row = document.createElement("div");
+        row.className = "property-row";
+
+        const label = document.createElement("label");
+        label.textContent = path;
+        row.appendChild(label);
+
+        const input = document.createElement("input");
+        input.value = formatPropertyValue(value);
+        input.readOnly = path.startsWith("ReadOnly.");
+        input.addEventListener("change", () => {
+            if (!selectedComponent) return;
+
+            selectedComponent.setProperty(path, input.value);
+            updateHoverStates();
+            draw();
+            renderPropertiesPanel();
+        });
+        row.appendChild(input);
+
+        fragment.appendChild(row);
+    }
+
+    return fragment;
+}
+
+function renderPropertiesPanel() {
+    propertiesPanel.replaceChildren();
+
+    if (!selectedComponent) {
+        const emptyMessage = document.createElement("p");
+        emptyMessage.className = "empty-properties";
+        emptyMessage.textContent = "Select a component to view its properties.";
+        propertiesPanel.appendChild(emptyMessage);
+        return;
+    }
+
+    const type = document.createElement("div");
+    type.className = "component-type";
+    type.textContent = selectedComponent.type;
+    propertiesPanel.appendChild(type);
+    propertiesPanel.appendChild(renderPropertyGroup(selectedComponent.getProperties()));
+}
+
+function clearSelection() {
+    for (const component of components) {
+        component.selected = false;
+        component.selectedTerminal = 0;
+    }
+
+    selectedComponent = null;
+    selectedTerminal = 0;
+    renderPropertiesPanel();
+}
+
+function applySelectionState() {
+    for (const component of components) {
+        if (component !== selectedComponent) {
+            component.selected = false;
+            component.selectedTerminal = 0;
+        }
+    }
+
+    if (!selectedComponent) return;
+
+    selectedComponent.selected = selectedTerminal === 0;
+    selectedComponent.selectedTerminal = selectedTerminal;
+}
+
+function selectComponent(component, terminal = 0) {
+    clearSelection();
+    selectedComponent = component;
+    selectedTerminal = terminal;
+    applySelectionState();
+    renderPropertiesPanel();
+}
+
 function updateHoverStates() {
-    let hoveredComponent = null;
+    hoveredComponent = null;
 
     for (const component of components) {
         component.onMouseMove(mouseGridPosition);
@@ -59,23 +159,50 @@ function updateHoverStates() {
         }
 
         component.hovered = false;
-        component.selected = false;
         component.hoveredTerminal = 0;
-        component.selectedTerminal = 0;
     }
 
-    if (!hoveredComponent) return;
+    applySelectionState();
+    renderPropertiesPanel();
+}
 
-    if (isLMB) {
-        hoveredComponent.selected = hoveredComponent.hovered;
+function moveSelectedComponent() {
+    if (!selectedComponent || !mouseGridPosition) return;
 
-        if (hoveredComponent.hoveredTerminal > 0) {
-            hoveredComponent.selectedTerminal =
-                hoveredComponent.hoveredTerminal;
+    if (selectedComponent.type === "Wire") {
+        if (selectedTerminal === 1) {
+            selectedComponent.position = mouseGridPosition.round();
+            selectedComponent.start = mouseGridPosition
+                .vecPush(selectedComponent.start.z)
+                .round();
+            selectedComponent.connections[1] = selectedComponent.end.subtract(
+                selectedComponent.start,
+            ).Vec2;
+        } else if (selectedTerminal === 2) {
+            selectedComponent.end = mouseGridPosition
+                .vecPush(selectedComponent.end.z)
+                .round();
+            selectedComponent.connections[1] = selectedComponent.end.subtract(
+                selectedComponent.start,
+            ).Vec2;
+        } else {
+            selectedComponent.position = mouseGridPosition
+                .add(startedPickUpOffset)
+                .round();
+            selectedComponent.start = selectedComponent.position.vecPush(
+                selectedComponent.start.z,
+            );
+            selectedComponent.end = selectedComponent.start.Vec2.vecPush(0).add(
+                selectedComponent.connections[1].vecPush(selectedComponent.end.z),
+            );
         }
     } else {
-        hoveredComponent.selected = false
+        selectedComponent.position = mouseGridPosition
+            .add(startedPickUpOffset)
+            .round();
     }
+
+    applySelectionState();
 }
 
 function drawGrid() {
@@ -125,7 +252,7 @@ function draw() {
 
     for (const component of components) {
         component.draw(ctx, zoom, pan);
-        if (component.hovered || component.selected) {
+        if (component.hovered || component.selected || component.selectedTerminal > 0) {
             drawLast = component;
         }
     }
@@ -141,9 +268,19 @@ canvas.addEventListener("contextmenu", (event) => {
 
 canvas.addEventListener("mousedown", (event) => {
     updateMouseGridPosition(event);
-
-    if (event.button === 0) isLMB = true;
     updateHoverStates();
+
+    if (event.button === 0) {
+        isLMB = true;
+
+        if (hoveredComponent) {
+            selectComponent(hoveredComponent, hoveredComponent.hoveredTerminal);
+            startedPickUpOffset = selectedComponent.position.subtract(mouseGridPosition);
+        } else {
+            clearSelection();
+        }
+    }
+
     draw();
 
     if (event.button !== 2) return;
@@ -155,15 +292,20 @@ canvas.addEventListener("mousedown", (event) => {
 
 canvas.addEventListener("mousemove", (event) => {
     updateMouseGridPosition(event);
-    updateHoverStates();
+
+    const mousePosition = getCanvasPosition(event);
+    const delta = mousePosition.subtract(lastMousePosition);
+
+    if (selectedComponent && isLMB) {
+        moveSelectedComponent();
+    } else {
+        updateHoverStates();
+    }
 
     if (!isPanning) {
         draw();
         return;
     }
-
-    const mousePosition = getCanvasPosition(event);
-    const delta = mousePosition.subtract(lastMousePosition);
 
     pan = pan.add(delta);
     lastMousePosition = mousePosition;
@@ -180,6 +322,7 @@ canvas.addEventListener("mouseup", (event) => {
 });
 
 canvas.addEventListener("mouseleave", () => {
+    isLMB = false;
     isPanning = false;
     mouseGridPosition = null;
     updateHoverStates();
@@ -210,4 +353,5 @@ canvas.addEventListener("wheel", (event) => {
 });
 
 window.addEventListener("resize", resizeCanvas);
+renderPropertiesPanel();
 resizeCanvas();

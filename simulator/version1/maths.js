@@ -81,6 +81,15 @@ export class Vector {
         return sum;
     }
 
+    vecPush(z) {
+        return new Vector(...this.values, z)
+    }
+
+    round() {
+        return new Vector(
+            ...this.values.map(v => Math.round(v))
+        );
+    }
     magnitude() {
         return Math.sqrt(this.dot(this));
     }

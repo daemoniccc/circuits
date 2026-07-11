@@ -62,6 +62,11 @@ function drawCircle(
     }
 }
 
+function parseBoolean(value) {
+    if (typeof value === "boolean") return value;
+    return value.toLowerCase() === "true";
+}
+
 export class Component {
     constructor(name, position, rotation, layer = 0) {
         this.name = name;
@@ -128,13 +133,13 @@ export class Component {
 
         if (name === "Position.X") this.position.x = Number(value);
 
-        if (name === "`Position.Y") this.position.y = Number(value);
+        if (name === "Position.Y") this.position.y = Number(value);
 
         if (name === "Rotation") this.rotation = Number(value);
 
         if (name === "Layer") this.layer = Number(value);
 
-        if (name === "Visible") this.visible = Boolean(value);
+        if (name === "Visible") this.visible = parseBoolean(value);
     }
 
     applyStyle(ctx) {
@@ -191,6 +196,8 @@ export class Resistor extends Component {
 
     getProperties() {
         return {
+            ...super.getProperties(),
+
             Parameters: {
                 R: this.resistance,
             },
@@ -199,7 +206,7 @@ export class Resistor extends Component {
                 V: this.potentialDifference,
                 I: this.current,
             },
-        }.concat(super.getProperties());
+        };
     }
 
     setProperty(name, value) {
@@ -273,16 +280,16 @@ export class Wire extends Component {
         };
     }
 
-    setProperty(name, value) {
-        if (name === "Start.X") {
-            this.start.x = Number(value);
-            this.position.x = Number(value);
-        }
+    updateConnections() {
+        this.position = this.start.Vec2;
+        this.connections[0] = new Vector(0, 0);
+        this.connections[1] = this.end.subtract(this.start).Vec2;
+    }
 
-        if (name === "Start.Y") {
-            this.start.y = Number(value);
-            this.position.y = Number(value);
-        }
+    setProperty(name, value) {
+        if (name === "Start.X") this.start.x = Number(value);
+
+        if (name === "Start.Y") this.start.y = Number(value);
         if (name === "Start.Z") this.start.z = Number(value);
 
         if (name === "End.X") this.end.x = Number(value);
@@ -290,7 +297,9 @@ export class Wire extends Component {
         if (name === "End.Y") this.end.y = Number(value);
 
         if (name === "End.Z") this.end.z = Number(value);
-        if (name === "Visible") this.visible = Boolean(value);
+        if (name === "Visible") this.visible = parseBoolean(value);
+
+        this.updateConnections();
     }
 
     onMouseMove(mouseGridPos) {
@@ -380,7 +389,7 @@ export class Wire extends Component {
         super.applyStyle(ctx);
         const path = [
             new Vector(0, 0),
-            new Vector(this.end.x - this.start.x, this.end.y - this.start.y),
+            this.connections[1],
         ];
 
         drawPath(ctx, path, this.position, 0, zoom, pan);

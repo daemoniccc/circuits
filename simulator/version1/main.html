@@ -34,6 +34,7 @@
 
             .left {
                 border-right: none;
+                overflow-y: auto;
             }
 
             .right {
@@ -75,6 +76,10 @@
                 margin-bottom: 10px;
             }
 
+            input[readonly] {
+                color: #999;
+            }
+
             .component-type {
                 color: #ccc;
                 font-size: 15px;
@@ -83,6 +88,12 @@
 
             .property-row {
                 margin-bottom: 10px;
+            }
+
+            .empty-properties {
+                color: #777;
+                font-size: 13px;
+                line-height: 1.4;
             }
 
             .canvas-wrap {
@@ -128,27 +139,8 @@
         <div class="app">
             <aside class="panel left">
                 <h2>Properties</h2>
-
-                <label for="component-name">Component Name</label>
-                <input id="component-name" type="text" value="R1" />
-
-                <div class="component-type">Resistor</div>
-
-                <h3>Data</h3>
-                <div class="property-row">
-                    <label>Node A</label>
-                    <input type="text" value="n1" />
-                </div>
-
-                <div class="property-row">
-                    <label>Node B</label>
-                    <input type="text" value="n2" />
-                </div>
-
-                <h3>Parameters</h3>
-                <div class="property-row">
-                    <label>Resistance</label>
-                    <input type="text" value="1000" />
+                <div id="properties-panel">
+                    <p class="empty-properties">Select a component to view its properties.</p>
                 </div>
             </aside>
 
