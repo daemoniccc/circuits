@@ -27,18 +27,36 @@
 
             .panel {
                 background: #181818;
-                border: 1px solid #2a2a2a;
                 padding: 14px;
                 overflow: hidden;
             }
 
             .left {
-                border-right: none;
+                border: none;
+                border-right: 1px solid #2a2a2a;
                 overflow-y: auto;
             }
 
             .right {
-                border-left: none;
+                border: none;
+                border-left: 1px solid #2a2a2a;
+                display: grid;
+                grid-template-rows: 1fr 1fr;
+                padding: 0;
+            }
+
+            .right-section {
+                min-height: 0;
+                overflow: hidden;
+                padding: 14px;
+            }
+
+            .right-section:first-child {
+                border-bottom: 1px solid #2a2a2a;
+            }
+
+            .right-section:last-child {
+                overflow-y: auto;
             }
 
             h2,
@@ -66,7 +84,8 @@
                 margin-bottom: 6px;
             }
 
-            input {
+            input,
+            select {
                 width: 100%;
                 padding: 8px;
                 background: #101010;
@@ -101,18 +120,16 @@
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 14px;
+                padding: 0;
             }
 
             canvas {
                 width: 100%;
                 height: 100%;
-                border: 1px solid #333;
-                border-radius: 6px;
             }
 
             .component-list {
-                height: calc(100vh - 58px);
+                height: calc(100% - 30px);
                 overflow-y: auto;
                 padding-right: 4px;
             }
@@ -149,19 +166,42 @@
             </main>
 
             <aside class="panel right">
-                <h2>Components</h2>
+                <section class="right-section">
+                    <h2>Components</h2>
 
-                <div class="component-list">
-                    <button class="component-btn">Resistor</button>
-                    <button class="component-btn">Capacitor</button>
-                    <button class="component-btn">Inductor</button>
-                    <button class="component-btn">Voltage Source</button>
-                    <button class="component-btn">Current Source</button>
-                    <button class="component-btn">Ground</button>
-                    <button class="component-btn">Diode</button>
-                    <button class="component-btn">Switch</button>
-                    <button class="component-btn">Wire</button>
-                </div>
+                    <div class="component-list" id="components-panel">
+                        <button class="component-btn">Wire</button>
+                        <button class="component-btn">Resistor</button>
+                        <button class="component-btn">Capacitor</button>
+                        <button class="component-btn">Voltage Source</button>
+                        <button class="component-btn">Current Source</button>
+                        <button class="component-btn">Signal Generator</button>
+                        <button class="component-btn">Fixed Voltage / Ground</button>
+                    </div>
+                </section>
+
+                <section class="right-section">
+                    <h2>Controls</h2>
+
+                    <label for="layer-from">View from layer</label>
+                    <input id="layer-from" type="number" value="0" />
+
+                    <label for="layer-to">View to layer</label>
+                    <input id="layer-to" type="number" value="100" />
+
+                    <label for="simulation-time">Time (seconds)</label>
+                    <input id="simulation-time" type="number" min="0" step="any" value="0" />
+
+                    <label for="time-step">Time per step (dt)</label>
+                    <input id="time-step" type="number" min="0" step="any" value="0.02" />
+
+                    <label for="steps-per-second">Time steps per second</label>
+                    <input id="steps-per-second" type="number" min="1" step="1" value="50" />
+
+                    <button id="simulation-toggle" class="component-btn" type="button">
+                        Pause
+                    </button>
+                </section>
             </aside>
         </div>
 

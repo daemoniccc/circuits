@@ -1,9 +1,31 @@
 import { Vector } from "./maths.js";
-import { Resistor, Wire } from "./canvasComponents.js";
+import {
+    Capacitor,
+    CurrentSource,
+    FixedVoltage,
+    Resistor,
+    SignalGenerator,
+    VoltageSource,
+    Wire,
+} from "./canvasComponents.js";
 
 const canvas = document.getElementById("circuit-canvas");
 const ctx = canvas.getContext("2d");
 const propertiesPanel = document.getElementById("properties-panel");
+
+const offscreen = document.createElement("canvas");
+offscreen.width = canvas.width;
+offscreen.height = canvas.height;
+
+const offCtx = offscreen.getContext("2d");
+
+const componentsPanel = document.getElementById("components-panel");
+const layerFromInput = document.getElementById("layer-from");
+const layerToInput = document.getElementById("layer-to");
+const simulationTimeInput = document.getElementById("simulation-time");
+const timeStepInput = document.getElementById("time-step");
+const stepsPerSecondInput = document.getElementById("steps-per-second");
+const simulationToggle = document.getElementById("simulation-toggle");
 
 const minZoom = 0.2;
 const maxZoom = 5;
@@ -20,15 +42,115 @@ let selectedComponent = null;
 let selectedTerminal = 0;
 let hoveredComponent = null;
 let startedPickUpOffset = new Vector(0, 0);
+let simulationPaused = false;
+let simulationTime = 0;
+let timeStep = 0.02;
+let timeStepsPerSecond = 50;
+let upperLayer = 100;
+let lowerLayer = 0;
 
 const components = [
     new Resistor("test", new Vector(4, 4), 0, 0, 5),
     new Wire(new Vector(0, 10, 0), new Vector(4, 4, 0)),
 ];
 
+function opacity(layer) {
+    if (layer <= upperLayer && layer >= lowerLayer) {
+        return 1;
+    } else if (layer < lowerLayer) {
+        return (1 / (lowerLayer - layer + 1)) ** 2;
+    } else if (layer > upperLayer) {
+        return (1 / (layer - upperLayer + 1)) ** 2;
+    }
+}
+
+function addComponent(name) {
+    switch (name) {
+        case "Wire":
+            components.push(new Wire(new Vector(0, 0, 0), new Vector(3, 0, 0)));
+            break;
+        case "Resistor":
+            components.push(
+                new Resistor("Resistor", new Vector(0, 0), 0, 0, 100),
+            );
+            break;
+        case "Capacitor":
+            components.push(
+                new Capacitor("Capacitor", new Vector(0, 0), 0, 0, 0.000001),
+            );
+            break;
+        case "Voltage Source":
+            components.push(
+                new VoltageSource(
+                    "Voltage Source",
+                    new Vector(0, 0),
+                    0,
+                    0,
+                    5,
+                ),
+            );
+            break;
+        case "Current Source":
+            components.push(
+                new CurrentSource(
+                    "Current Source",
+                    new Vector(0, 0),
+                    0,
+                    0,
+                    1,
+                ),
+            );
+            break;
+        case "Signal Generator":
+            components.push(
+                new SignalGenerator(
+                    "Signal Generator",
+                    new Vector(0, 0),
+                    0,
+                    0,
+                    "sine",
+                ),
+            );
+            break;
+        case "Fixed Voltage / Ground":
+            components.push(
+                new FixedVoltage("Ground", new Vector(0, 0), 0, 0, 0),
+            );
+            break;
+    }
+    draw();
+}
+
+function updateVisibleLayerRange(fromLayer, toLayer) {
+    lowerLayer = fromLayer;
+    upperLayer = toLayer;
+    draw();
+}
+
+function setSimulationPaused(isPaused) {
+    // TODO: Pause or start the circuit simulation.
+}
+
+function setSimulationTime(time) {
+    simulationTime = time;
+    // TODO: Move or reset the simulation to this time.
+}
+
+function setTimeStep(dt) {
+    timeStep = dt;
+    // TODO: Apply this dt to each simulation step.
+}
+
+function setTimeStepsPerSecond(stepsPerSecond) {
+    timeStepsPerSecond = stepsPerSecond;
+    // TODO: Apply this rate to the simulation loop.
+}
+
 function resizeCanvas() {
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
+    offscreen.width = canvas.width;
+    offscreen.height = canvas.height;
     draw();
 }
 
@@ -75,18 +197,40 @@ function renderPropertyGroup(properties, parentPath = "") {
         label.textContent = path;
         row.appendChild(label);
 
-        const input = document.createElement("input");
-        input.value = formatPropertyValue(value);
-        input.readOnly = path.startsWith("ReadOnly.");
-        input.addEventListener("change", () => {
+        let control;
+
+        if (
+            path === "Parameters.Waveform" ||
+            path === "Parameters.Source Type"
+        ) {
+            control = document.createElement("select");
+
+            const choices =
+                path === "Parameters.Waveform"
+                    ? SignalGenerator.waveforms
+                    : SignalGenerator.sourceTypes;
+
+            for (const choice of choices) {
+                const option = document.createElement("option");
+                option.value = choice;
+                option.textContent = choice[0].toUpperCase() + choice.slice(1);
+                control.appendChild(option);
+            }
+        } else {
+            control = document.createElement("input");
+            control.readOnly = path.startsWith("ReadOnly.");
+        }
+
+        control.value = formatPropertyValue(value);
+        control.addEventListener("change", () => {
             if (!selectedComponent) return;
 
-            selectedComponent.setProperty(path, input.value);
+            selectedComponent.setProperty(path, control.value);
             updateHoverStates();
             draw();
             renderPropertiesPanel();
         });
-        row.appendChild(input);
+        row.appendChild(control);
 
         fragment.appendChild(row);
     }
@@ -109,7 +253,9 @@ function renderPropertiesPanel() {
     type.className = "component-type";
     type.textContent = selectedComponent.type;
     propertiesPanel.appendChild(type);
-    propertiesPanel.appendChild(renderPropertyGroup(selectedComponent.getProperties()));
+    propertiesPanel.appendChild(
+        renderPropertyGroup(selectedComponent.getProperties()),
+    );
 }
 
 function clearSelection() {
@@ -149,7 +295,7 @@ function updateHoverStates() {
     hoveredComponent = null;
 
     for (const component of components) {
-        component.onMouseMove(mouseGridPosition);
+        component.onMouseMove(mouseGridPosition, lowerLayer, upperLayer);
 
         const isHovered = component.hovered || component.hoveredTerminal > 0;
 
@@ -171,6 +317,15 @@ function moveSelectedComponent() {
 
     if (selectedComponent.type === "Wire") {
         if (selectedTerminal === 1) {
+            if (
+                !selectedComponent.isTerminalSelectable(
+                    1,
+                    lowerLayer,
+                    upperLayer,
+                )
+            ) {
+                return;
+            }
             selectedComponent.position = mouseGridPosition.round();
             selectedComponent.start = mouseGridPosition
                 .vecPush(selectedComponent.start.z)
@@ -179,6 +334,15 @@ function moveSelectedComponent() {
                 selectedComponent.start,
             ).Vec2;
         } else if (selectedTerminal === 2) {
+            if (
+                !selectedComponent.isTerminalSelectable(
+                    2,
+                    lowerLayer,
+                    upperLayer,
+                )
+            ) {
+                return;
+            }
             selectedComponent.end = mouseGridPosition
                 .vecPush(selectedComponent.end.z)
                 .round();
@@ -186,6 +350,20 @@ function moveSelectedComponent() {
                 selectedComponent.start,
             ).Vec2;
         } else {
+            if (
+                !selectedComponent.isTerminalSelectable(
+                    1,
+                    lowerLayer,
+                    upperLayer,
+                ) ||
+                !selectedComponent.isTerminalSelectable(
+                    2,
+                    lowerLayer,
+                    upperLayer,
+                )
+            ) {
+                return;
+            }
             selectedComponent.position = mouseGridPosition
                 .add(startedPickUpOffset)
                 .round();
@@ -193,7 +371,9 @@ function moveSelectedComponent() {
                 selectedComponent.start.z,
             );
             selectedComponent.end = selectedComponent.start.Vec2.vecPush(0).add(
-                selectedComponent.connections[1].vecPush(selectedComponent.end.z),
+                selectedComponent.connections[1].vecPush(
+                    selectedComponent.end.z,
+                ),
             );
         }
     } else {
@@ -244,23 +424,155 @@ function drawMouseGridPosition() {
     );
 }
 
+function toLayers() {
+    const layers = new Map();
+
+    function getLayer(layer) {
+        if (!layers.has(layer)) {
+            layers.set(layer, { components: [], wireTerminals: [] });
+        }
+
+        return layers.get(layer);
+    }
+
+    for (const component of components) {
+        getLayer(component.layer).components.push(component);
+
+        if (component instanceof Wire) {
+            getLayer(component.start.z).wireTerminals.push({
+                component,
+                terminal: 1,
+            });
+            getLayer(component.end.z).wireTerminals.push({
+                component,
+                terminal: 2,
+            });
+        }
+    }
+
+    return layers;
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawGrid();
 
-    let drawLast;
+    const drawLast = [];
+    const terminalsToDrawLast = [];
 
-    for (const component of components) {
-        component.draw(ctx, zoom, pan);
-        if (component.hovered || component.selected || component.selectedTerminal > 0) {
-            drawLast = component;
+    const layers = [...toLayers().entries()].sort(
+        ([layerA], [layerB]) => layerA - layerB,
+    );
+
+    for (const [layerNumber, layerContents] of layers) {
+        offCtx.clearRect(0, 0, offscreen.width, offscreen.height);
+
+        for (const component of layerContents.components) {
+            if (
+                component.hovered ||
+                component.selected ||
+                component.selectedTerminal > 0
+            ) {
+                drawLast.push(component);
+            } else {
+                component.draw(offCtx, zoom, pan);
+            }
         }
+
+        for (const { component, terminal } of layerContents.wireTerminals) {
+            if (
+                component.selected ||
+                component.selectedTerminal === terminal ||
+                component.hovered ||
+                component.hoveredTerminal === terminal
+            ) {
+                terminalsToDrawLast.push({
+                    component,
+                    terminal,
+                    layer: layerNumber,
+                });
+            } else {
+                component.drawTerminal(offCtx, terminal, zoom, pan);
+            }
+        }
+
+        ctx.save();
+        ctx.globalAlpha = opacity(layerNumber);
+        ctx.drawImage(offscreen, 0, 0);
+        ctx.restore();
     }
 
-    if (drawLast) drawLast.draw(ctx, zoom, pan);
+    for (const component of drawLast) {
+        component.draw(ctx, zoom, pan);
+    }
+
+    for (const { component, terminal, layer } of terminalsToDrawLast) {
+        ctx.save();
+        ctx.globalAlpha = opacity(layer);
+        component.drawTerminal(ctx, terminal, zoom, pan);
+        ctx.restore();
+    }
 
     drawMouseGridPosition();
 }
+
+componentsPanel.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+        addComponent(button.textContent.trim());
+    });
+});
+
+function handleLayerRangeChange() {
+    updateVisibleLayerRange(
+        Number(layerFromInput.value),
+        Number(layerToInput.value),
+    );
+    clearSelection();
+}
+
+layerFromInput.addEventListener("input", handleLayerRangeChange);
+layerToInput.addEventListener("input", handleLayerRangeChange);
+
+simulationTimeInput.addEventListener("change", () => {
+    setSimulationTime(Number(simulationTimeInput.value));
+});
+
+timeStepInput.addEventListener("change", () => {
+    setTimeStep(Number(timeStepInput.value));
+});
+
+stepsPerSecondInput.addEventListener("change", () => {
+    setTimeStepsPerSecond(Number(stepsPerSecondInput.value));
+});
+
+simulationToggle.addEventListener("click", () => {
+    simulationPaused = !simulationPaused;
+    simulationToggle.textContent = simulationPaused ? "Start" : "Pause";
+    setSimulationPaused(simulationPaused);
+});
+
+window.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable;
+
+    if (
+        isTyping ||
+        event.repeat ||
+        event.key.toLowerCase() !== "r" ||
+        !selectedComponent ||
+        selectedComponent.type === "Wire"
+    ) {
+        return;
+    }
+
+    selectedComponent.rotation = (selectedComponent.rotation + 90) % 360;
+    updateHoverStates();
+    draw();
+});
 
 canvas.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -275,7 +587,8 @@ canvas.addEventListener("mousedown", (event) => {
 
         if (hoveredComponent) {
             selectComponent(hoveredComponent, hoveredComponent.hoveredTerminal);
-            startedPickUpOffset = selectedComponent.position.subtract(mouseGridPosition);
+            startedPickUpOffset =
+                selectedComponent.position.subtract(mouseGridPosition);
         } else {
             clearSelection();
         }
