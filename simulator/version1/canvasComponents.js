@@ -77,6 +77,7 @@ export class Component {
         this.name = name;
         this.position = position;
         this.connections = [];
+        this.terminalLabels = [];
 
         this.selectedTerminal = 0;
         this.hoveredTerminal = 0;
@@ -188,6 +189,52 @@ export class Component {
                 true,
             );
         }
+    }
+
+    drawTerminalLabels(ctx, zoom, pan) {
+        if (!this.hovered || this.terminalLabels.length === 0) return;
+
+        const centre = new Vector(this.size.x / 2, 0);
+
+        ctx.save();
+        ctx.fillStyle = "#52a7ff";
+        ctx.font = "12px Arial";
+        ctx.textBaseline = "middle";
+
+        for (let i = 0; i < this.connections.length; i++) {
+            const label = this.terminalLabels[i];
+            if (!label) continue;
+
+            const connection = this.connections[i];
+            let direction = connection.subtract(centre).normalize();
+
+            if (direction.magnitude() === 0) {
+                direction = new Vector(0, -1);
+            }
+
+            const rotatedConnection = rotatePoint(connection, this.rotation);
+            const rotatedDirection = rotatePoint(direction, this.rotation);
+            const terminalScreen = worldToScreen(
+                this.position.add(rotatedConnection),
+                zoom,
+                pan,
+            );
+            const labelOffset = 20;
+            const x = terminalScreen.x + rotatedDirection.x * labelOffset;
+            const y = terminalScreen.y + rotatedDirection.y * labelOffset;
+
+            if (rotatedDirection.x > 0.25) {
+                ctx.textAlign = "left";
+            } else if (rotatedDirection.x < -0.25) {
+                ctx.textAlign = "right";
+            } else {
+                ctx.textAlign = "center";
+            }
+
+            ctx.fillText(label, x, y);
+        }
+
+        ctx.restore();
     }
 }
 
@@ -323,6 +370,280 @@ export class Capacitor extends Component {
         for (const path of paths) {
             drawPath(ctx, path, this.position, this.rotation, zoom, pan);
         }
+    }
+}
+
+export class UniversalInductor extends Component {
+    constructor(name, position, rotation, layer, inductance) {
+        super(name, position, rotation, layer);
+
+        this.inductance = inductance;
+        this.seriesResistance = 0;
+        this.initialCurrent = 0;
+        this.saturationCurrent = 10;
+        this.parallelCapacitance = 0;
+        this.potentialDifference = 0;
+        this.current = 0;
+        this.flux = 0;
+        this.size = new Vector(5, 2);
+        this.connections = [new Vector(0, 0), new Vector(this.size.x, 0)];
+    }
+
+    get type() {
+        return "UniversalInductor";
+    }
+
+    getProperties() {
+        return {
+            ...super.getProperties(),
+
+            Parameters: {
+                L: this.inductance,
+                "Series Resistance": this.seriesResistance,
+                "Initial Current": this.initialCurrent,
+                "Saturation Current": this.saturationCurrent,
+                "Parallel Capacitance": this.parallelCapacitance,
+            },
+
+            ReadOnly: {
+                V: this.potentialDifference,
+                I: this.current,
+                Flux: this.flux,
+            },
+        };
+    }
+
+    setProperty(name, value) {
+        super.setProperty(name, value);
+
+        if (name === "Parameters.L") this.inductance = Number(value);
+        if (name === "Parameters.Series Resistance") {
+            this.seriesResistance = Number(value);
+        }
+        if (name === "Parameters.Initial Current") {
+            this.initialCurrent = Number(value);
+        }
+        if (name === "Parameters.Saturation Current") {
+            this.saturationCurrent = Number(value);
+        }
+        if (name === "Parameters.Parallel Capacitance") {
+            this.parallelCapacitance = Number(value);
+        }
+    }
+
+    draw(ctx, zoom, pan) {
+        if (!this.visible) return;
+
+        super.draw(ctx, zoom, pan);
+
+        const coilPath = [];
+        const coilStart = 1;
+        const coilEnd = 4;
+        const samples = 48;
+        const turns = 4;
+
+        for (let i = 0; i <= samples; i++) {
+            const progress = i / samples;
+            coilPath.push(
+                new Vector(
+                    coilStart + (coilEnd - coilStart) * progress,
+                    -Math.abs(Math.sin(progress * turns * Math.PI)) * 0.75,
+                ),
+            );
+        }
+
+        const paths = [
+            [new Vector(0, 0), new Vector(coilStart, 0)],
+            coilPath,
+            [new Vector(coilEnd, 0), new Vector(this.size.x, 0)],
+        ];
+
+        for (const path of paths) {
+            drawPath(ctx, path, this.position, this.rotation, zoom, pan);
+        }
+    }
+}
+
+export class Diode extends Component {
+    constructor(name, position, rotation, layer) {
+        super(name, position, rotation, layer);
+
+        this.forwardVoltage = 0.7;
+        this.saturationCurrent = 1e-12;
+        this.idealityFactor = 1;
+        this.potentialDifference = 0;
+        this.current = 0;
+        this.size = new Vector(4, 2);
+        this.connections = [new Vector(0, 0), new Vector(this.size.x, 0)];
+    }
+
+    get type() {
+        return "Diode";
+    }
+
+    getProperties() {
+        return {
+            ...super.getProperties(),
+
+            Parameters: {
+                Vf: this.forwardVoltage,
+                Is: this.saturationCurrent,
+                N: this.idealityFactor,
+            },
+
+            ReadOnly: {
+                V: this.potentialDifference,
+                I: this.current,
+            },
+        };
+    }
+
+    setProperty(name, value) {
+        super.setProperty(name, value);
+
+        if (name === "Parameters.Vf") this.forwardVoltage = Number(value);
+        if (name === "Parameters.Is") this.saturationCurrent = Number(value);
+        if (name === "Parameters.N") this.idealityFactor = Number(value);
+    }
+
+    draw(ctx, zoom, pan) {
+        if (!this.visible) return;
+
+        super.draw(ctx, zoom, pan);
+
+        const paths = [
+            [new Vector(0, 0), new Vector(1.25, 0)],
+            [
+                new Vector(1.25, -1),
+                new Vector(2.75, 0),
+                new Vector(1.25, 1),
+                new Vector(1.25, -1),
+            ],
+            [new Vector(2.75, -1), new Vector(2.75, 1)],
+            [new Vector(2.75, 0), new Vector(this.size.x, 0)],
+        ];
+
+        for (const path of paths) {
+            drawPath(ctx, path, this.position, this.rotation, zoom, pan);
+        }
+    }
+}
+
+export class MOSFET extends Component {
+    static types = ["nmos", "pmos"];
+
+    constructor(name, position, rotation, layer, mosfetType = "nmos") {
+        super(name, position, rotation, layer);
+
+        this.mosfetType = MOSFET.types.includes(mosfetType)
+            ? mosfetType
+            : "nmos";
+        this.thresholdVoltage = 1;
+        this.transconductance = 0.001;
+        this.channelLengthModulation = 0;
+        this.gateSourceVoltage = 0;
+        this.drainSourceVoltage = 0;
+        this.drainCurrent = 0;
+        this.size = new Vector(4, 2);
+        this.connections = [
+            new Vector(0, 0),
+            new Vector(this.size.x, -1),
+            new Vector(this.size.x, 1),
+        ];
+        this.terminalLabels = ["Gate", "Drain", "Source"];
+    }
+
+    get type() {
+        return "MOSFET";
+    }
+
+    getProperties() {
+        return {
+            ...super.getProperties(),
+
+            Parameters: {
+                "MOSFET Type": this.mosfetType,
+                Vth: this.thresholdVoltage,
+                K: this.transconductance,
+                Lambda: this.channelLengthModulation,
+            },
+
+            ReadOnly: {
+                Vgs: this.gateSourceVoltage,
+                Vds: this.drainSourceVoltage,
+                Id: this.drainCurrent,
+            },
+        };
+    }
+
+    setProperty(name, value) {
+        super.setProperty(name, value);
+
+        if (name === "Parameters.MOSFET Type") {
+            const mosfetType = String(value).toLowerCase();
+            if (MOSFET.types.includes(mosfetType)) {
+                this.mosfetType = mosfetType;
+            }
+        }
+
+        if (name === "Parameters.Vth") this.thresholdVoltage = Number(value);
+        if (name === "Parameters.K") this.transconductance = Number(value);
+        if (name === "Parameters.Lambda") {
+            this.channelLengthModulation = Number(value);
+        }
+    }
+
+    draw(ctx, zoom, pan) {
+        if (!this.visible) return;
+
+        super.draw(ctx, zoom, pan);
+
+        const paths = [
+            [new Vector(0, 0), new Vector(1, 0)],
+            [new Vector(1, -0.8), new Vector(1, 0.8)],
+            [new Vector(1.6, -0.8), new Vector(1.6, -0.3)],
+            [new Vector(1.6, -0.2), new Vector(1.6, 0.2)],
+            [new Vector(1.6, 0.3), new Vector(1.6, 0.8)],
+            [
+                new Vector(1.6, -0.65),
+                new Vector(2.5, -0.65),
+                new Vector(2.5, -1),
+                new Vector(4, -1),
+            ],
+            [
+                new Vector(1.6, 0.65),
+                new Vector(2.5, 0.65),
+                new Vector(2.5, 1),
+                new Vector(4, 1),
+            ],
+            [new Vector(2.5, -0.65), new Vector(2.5, 0.65)],
+        ];
+
+        const arrowTipX = this.mosfetType === "nmos" ? 1.75 : 2.35;
+        const arrowBaseX = this.mosfetType === "nmos" ? 2.3 : 1.8;
+        paths.push(
+            [new Vector(arrowBaseX, 0.3), new Vector(arrowTipX, 0.3)],
+            [new Vector(arrowTipX, 0.3), new Vector(arrowBaseX, 0.05)],
+            [new Vector(arrowTipX, 0.3), new Vector(arrowBaseX, 0.55)],
+        );
+
+        if (this.mosfetType === "pmos") {
+            drawCircle(
+                ctx,
+                new Vector(1.3, 0),
+                3,
+                this.position,
+                this.rotation,
+                zoom,
+                pan,
+            );
+        }
+
+        for (const path of paths) {
+            drawPath(ctx, path, this.position, this.rotation, zoom, pan);
+        }
+
+        this.drawTerminalLabels(ctx, zoom, pan);
     }
 }
 
@@ -810,6 +1131,62 @@ export class FixedVoltage extends Component {
         for (const bar of groundBars) {
             drawPath(ctx, bar, this.position, this.rotation, zoom, pan);
         }
+    }
+}
+
+export class Reader extends Component {
+    constructor(name, position, rotation, layer) {
+        super(name, position, rotation, layer);
+
+        this.potentialDifference = 0;
+        this.current = 0;
+
+        this.vs = []
+        this.is = []
+        this.size = new Vector(3, 2);
+        this.connections = [new Vector(0, 0)];
+    }
+
+    get type() {
+        return "Reader";
+    }
+
+    getProperties() {
+        return {
+            ...super.getProperties(),
+
+            ReadOnly: {
+                V: this.potentialDifference,
+                I: this.current,
+            },
+        };
+    }
+
+    draw(ctx, zoom, pan) {
+        if (!this.visible) return;
+
+        super.draw(ctx, zoom, pan);
+
+        const centre = new Vector(2, 0);
+        const paths = [
+            [new Vector(0, 0), new Vector(1, 0)],
+            [centre, new Vector(2.55, -0.5)],
+            [new Vector(1.45, 0.6), new Vector(2.55, 0.6)],
+        ];
+
+        for (const path of paths) {
+            drawPath(ctx, path, this.position, this.rotation, zoom, pan);
+        }
+
+        drawCircle(
+            ctx,
+            centre,
+            gridSize,
+            this.position,
+            this.rotation,
+            zoom,
+            pan,
+        );
     }
 }
 

@@ -2,9 +2,13 @@ import { Vector } from "./maths.js";
 import {
     Capacitor,
     CurrentSource,
+    Diode,
     FixedVoltage,
+    MOSFET,
+    Reader,
     Resistor,
     SignalGenerator,
+    UniversalInductor,
     VoltageSource,
     Wire,
 } from "./canvasComponents.js";
@@ -12,6 +16,10 @@ import {
 const canvas = document.getElementById("circuit-canvas");
 const ctx = canvas.getContext("2d");
 const propertiesPanel = document.getElementById("properties-panel");
+const probePopout = document.getElementById("probe-popout");
+const probeOpenButton = document.getElementById("probe-open");
+const probeCloseButton = document.getElementById("probe-close");
+const probeCanvas = document.getElementById("probe-canvas");
 
 const offscreen = document.createElement("canvas");
 offscreen.width = canvas.width;
@@ -79,6 +87,25 @@ function addComponent(name) {
                 new Capacitor("Capacitor", new Vector(0, 0), 0, 0, 0.000001),
             );
             break;
+        case "Universal Inductor":
+            components.push(
+                new UniversalInductor(
+                    "Inductor",
+                    new Vector(0, 0),
+                    0,
+                    0,
+                    0.001,
+                ),
+            );
+            break;
+        case "Diode":
+            components.push(new Diode("Diode", new Vector(0, 0), 0, 0));
+            break;
+        case "MOSFET":
+            components.push(
+                new MOSFET("MOSFET", new Vector(0, 0), 0, 0, "nmos"),
+            );
+            break;
         case "Voltage Source":
             components.push(
                 new VoltageSource(
@@ -117,6 +144,9 @@ function addComponent(name) {
                 new FixedVoltage("Ground", new Vector(0, 0), 0, 0, 0),
             );
             break;
+        case "Reader":
+            components.push(new Reader("Reader", new Vector(0, 0), 0, 0));
+            break;
     }
     draw();
 }
@@ -152,6 +182,11 @@ function resizeCanvas() {
     offscreen.width = canvas.width;
     offscreen.height = canvas.height;
     draw();
+}
+
+function resizeProbeCanvas() {
+    probeCanvas.width = probeCanvas.clientWidth;
+    probeCanvas.height = probeCanvas.clientHeight;
 }
 
 function getCanvasPosition(event) {
@@ -199,18 +234,16 @@ function renderPropertyGroup(properties, parentPath = "") {
 
         let control;
 
-        if (
-            path === "Parameters.Waveform" ||
-            path === "Parameters.Source Type"
-        ) {
+        const selectChoices = {
+            "Parameters.Waveform": SignalGenerator.waveforms,
+            "Parameters.Source Type": SignalGenerator.sourceTypes,
+            "Parameters.MOSFET Type": MOSFET.types,
+        };
+
+        if (selectChoices[path]) {
             control = document.createElement("select");
 
-            const choices =
-                path === "Parameters.Waveform"
-                    ? SignalGenerator.waveforms
-                    : SignalGenerator.sourceTypes;
-
-            for (const choice of choices) {
+            for (const choice of selectChoices[path]) {
                 const option = document.createElement("option");
                 option.value = choice;
                 option.textContent = choice[0].toUpperCase() + choice.slice(1);
@@ -551,6 +584,17 @@ simulationToggle.addEventListener("click", () => {
     setSimulationPaused(simulationPaused);
 });
 
+probeOpenButton.addEventListener("click", () => {
+    probePopout.classList.add("open");
+    probePopout.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(resizeProbeCanvas);
+});
+
+probeCloseButton.addEventListener("click", () => {
+    probePopout.classList.remove("open");
+    probePopout.setAttribute("aria-hidden", "true");
+});
+
 window.addEventListener("keydown", (event) => {
     const target = event.target;
     const isTyping =
@@ -665,6 +709,9 @@ canvas.addEventListener("wheel", (event) => {
     draw();
 });
 
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => {
+    resizeCanvas();
+    if (probePopout.classList.contains("open")) resizeProbeCanvas();
+});
 renderPropertiesPanel();
 resizeCanvas();
